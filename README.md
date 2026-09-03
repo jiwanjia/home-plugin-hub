@@ -30,6 +30,7 @@ Copy the example files before changing them. Do not put credentials into files t
 
 ```powershell
 Copy-Item config/plugins.example.yaml config/plugins.yaml
+Copy-Item config/residents.example.yaml config/residents.yaml
 python -m plugin_hub.doctor
 python -m plugin_hub.daemon --manifest config/plugins.yaml
 ```
@@ -45,6 +46,8 @@ python -m plugin_hub.stdio_bridge --client example --memory-route local_example
 ```
 
 See `.mcp.example.json` for a generic client configuration. The resident example contains placeholders only and is not a real identity or memory source.
+
+The bridge is intended to be launched by an MCP client. Running it directly in a terminal leaves it waiting silently for JSON-RPC messages on standard input.
 
 ## Repository layout
 
@@ -85,6 +88,7 @@ Home Plugin Hub 是一个小型、本地优先的插件运行时，用统一目�
 ```powershell
 python -m pip install -r requirements.txt
 Copy-Item config/plugins.example.yaml config/plugins.yaml
+Copy-Item config/residents.example.yaml config/residents.yaml
 python -m plugin_hub.doctor
 python -m plugin_hub.daemon --manifest config/plugins.yaml
 ```
@@ -98,6 +102,8 @@ python -m plugin_hub.stdio_bridge --client example --memory-route local_example
 ```
 
 `.mcp.example.json` 与 `config/residents.example.yaml` 只包含通用占位示例，不对应真实身份或记忆来源。
+
+stdio bridge 通常应由 MCP 客户端自动启动；如果直接在终端运行，它会安静等待标准输入中的 JSON-RPC 消息，并不是卡住。
 
 ## 安全说明
 
