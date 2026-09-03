@@ -1,0 +1,11 @@
+version: 1
+pipe_name: '\\.\pipe\home-plugin-hub'
+plugins:
+  - id: fixture
+    kind: mcp_stdio
+    enabled: true
+    command: python
+    args:
+      - -m
+      - plugin_hub.fixture_mcp_server
+    env_vars: []

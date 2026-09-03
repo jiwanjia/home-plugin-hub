@@ -1,0 +1,1 @@
+# Toy MCP — tests package

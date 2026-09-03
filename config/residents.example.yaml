@@ -1,0 +1,13 @@
+version: 1
+residents:
+  - id: example
+    display_name: Example Client
+    memory_namespace: example
+    identity_prompt: Generic example client with no private identity.
+    default_memory_route: local_example
+    memory_routes:
+      - id: local_example
+        storage: local
+        source: example-placeholder
+        context_model: none
+    model_families: []

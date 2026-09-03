@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "home-plugin-hub": {
+      "command": "python",
+      "args": [
+        "-m",
+        "plugin_hub.stdio_bridge",
+        "--client",
+        "example",
+        "--memory-route",
+        "local_example"
+      ]
+    }
+  }
+}

@@ -1,0 +1,43 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*credentials*
+*token_cache*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Runtime and private data
+data/
+*.db
+*.sqlite*
+*.jsonl
+*.log
+logs/
+sessions/
+session/
+memo/
+memos/
+screenshots/
+raw/
+backups/
+tmp/
+.tmp/
+
+# Build and editor artifacts
+build/
+dist/
+*.egg-info/
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
