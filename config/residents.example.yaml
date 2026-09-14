@@ -10,4 +10,13 @@ residents:
         storage: local
         source: example-placeholder
         context_model: none
+      - id: public_example
+        storage: vps
+        source: public-app-placeholder
+        context_model: none
     model_families: []
+    mcp_routes:
+      - id: example_app
+        write_memory_route: public_example
+        read_memory_routes:
+          - public_example

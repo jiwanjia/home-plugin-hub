@@ -112,3 +112,19 @@ stdio bridge 通常应由 MCP 客户端自动启动；如果直接在终端运�
 ## 许可证
 
 MIT，详见 `LICENSE`。
+
+## Remote MCP and OAuth reference
+
+The repository now includes the original HOME host integration for exposing one running Hub through a route-scoped HTTP MCP endpoint. The reference uses OAuth dynamic client registration, Authorization Code + PKCE S256, refresh tokens, exact resource binding, and a server-selected resident route. It is intentionally not a second Hub process.
+
+Reference files live under `codex-web-client/backend/app/hub/` and `codex-web-client/backend/app/api/`. They are not a standalone server: the embedding FastAPI host must provide its own owner authentication, OAuth persistence, rate limiter, HTTPS proxy, router wiring, and trusted resident configuration. See `docs/REMOTE_MCP_OAUTH.md` before integrating them.
+
+The original read-only Plugin Socket page is also included under `codex-web-client/frontend/src/`. It expects an authenticated host endpoint at `/api/plugin-socket`; the private HOME shell and login pages are not included.
+
+## 公网 MCP、OAuth 与插件插座参考实现
+
+仓库现已包含 HOME 宿主中用于把同一个运行中 Hub 暴露为 resident 路由 HTTP MCP 的原始参考实现。它复用 OAuth 动态客户端注册、Authorization Code + PKCE S256、refresh token、严格 resource 绑定和服务端选择的 resident 路由，不会启动第二个 Hub。
+
+参考源码位于 `codex-web-client/backend/app/hub/` 与 `codex-web-client/backend/app/api/`，不能单独作为完整服务运行。接入方必须自行提供宿主登录、OAuth 持久化、限流、HTTPS 反向代理、路由装配和可信 resident 配置；接入前请阅读 `docs/REMOTE_MCP_OAUTH.md`。
+
+原插件插座只读页面也位于 `codex-web-client/frontend/src/`。它依赖宿主提供经过认证的 `/api/plugin-socket`；HOME 私人外壳与登录页面没有公开。

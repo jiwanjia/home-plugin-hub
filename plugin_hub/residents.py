@@ -2,13 +2,17 @@
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Any, Dict, Optional, Tuple
 
 import yaml
 
+from continuum.resident_scope import ResidentScope
+
 
 SUPPORTED_VERSION = 1
 SUPPORTED_MEMORY_STORAGES = {"local", "vps"}
+MCP_ROUTE_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 DEFAULT_RESIDENTS_PATH = (
     Path(__file__).resolve().parents[1] / "config" / "residents.yaml"
 )
@@ -40,6 +44,16 @@ class ResidentModelFamily:
 
 
 @dataclass(frozen=True)
+class ResidentMcpRoute:
+    """One public MCP entry point backed by existing resident memory routes."""
+
+    resident_id: str
+    id: str
+    write_route: ResidentMemoryRoute
+    read_routes: Tuple[ResidentMemoryRoute, ...]
+
+
+@dataclass(frozen=True)
 class ResidentDefinition:
     """One self-chosen Home identity recorded after that choice exists."""
 
@@ -50,6 +64,14 @@ class ResidentDefinition:
     default_memory_route: Optional[str]
     memory_routes: Tuple[ResidentMemoryRoute, ...]
     model_families: Tuple[ResidentModelFamily, ...]
+    mcp_routes: Tuple[ResidentMcpRoute, ...]
+
+    def continuum_scope(self) -> ResidentScope:
+        """Build the immutable Continuum scope chosen by trusted config."""
+        return ResidentScope(
+            resident_id=self.id,
+            memory_namespace=self.memory_namespace,
+        )
 
     def resolve_memory_route(
         self,
@@ -76,10 +98,20 @@ class ResidentRegistry:
     def __init__(self, residents: Tuple[ResidentDefinition, ...]):
         self._residents = residents
         self._by_id = {resident.id: resident for resident in residents}
+        self._mcp_by_id: dict[str, ResidentMcpRoute] = {}
+        for resident in residents:
+            for route in resident.mcp_routes:
+                if route.id in self._mcp_by_id:
+                    raise ResidentRegistryError(f"MCP route id is duplicated: {route.id}")
+                self._mcp_by_id[route.id] = route
 
     @property
     def ids(self) -> Tuple[str, ...]:
         return tuple(resident.id for resident in self._residents)
+
+    @property
+    def mcp_route_ids(self) -> Tuple[str, ...]:
+        return tuple(self._mcp_by_id)
 
     def get(self, resident_id: str) -> ResidentDefinition:
         resident = self._by_id.get(resident_id)
@@ -87,12 +119,22 @@ class ResidentRegistry:
             raise ValueError(f"未知 Home 住户身份: {resident_id!r}")
         return resident
 
+    def resolve_continuum_scope(self, resident_id: str) -> ResidentScope:
+        """Resolve structured-memory ownership without using model input."""
+        return self.get(resident_id).continuum_scope()
+
     def resolve_memory_route(
         self,
         resident_id: str,
         route_id: Optional[str],
     ) -> ResidentMemoryRoute:
         return self.get(resident_id).resolve_memory_route(route_id)
+
+    def resolve_mcp_route(self, route_id: str) -> ResidentMcpRoute:
+        route = self._mcp_by_id.get(route_id)
+        if route is None:
+            raise ValueError(f"unknown resident MCP route: {route_id!r}")
+        return route
 
     def resolve_model_family(
         self,
@@ -189,6 +231,11 @@ def _validate_resident(
         resident_id,
         {route.id for route in routes},
     )
+    mcp_routes = _validate_mcp_routes(
+        raw.get("mcp_routes", []),
+        resident_id,
+        {route.id: route for route in routes},
+    )
     return ResidentDefinition(
         id=resident_id,
         display_name=display_name,
@@ -197,7 +244,76 @@ def _validate_resident(
         default_memory_route=default_memory_route,
         memory_routes=routes,
         model_families=model_families,
+        mcp_routes=mcp_routes,
     )
+
+
+def _validate_mcp_routes(
+    raw_routes: Any,
+    resident_id: str,
+    memory_routes: Dict[str, ResidentMemoryRoute],
+) -> Tuple[ResidentMcpRoute, ...]:
+    """Validate public routes at the trusted config boundary."""
+    if not isinstance(raw_routes, list):
+        raise ResidentRegistryError(
+            f"resident {resident_id} mcp_routes must be a list"
+        )
+
+    routes = []
+    seen_ids = set()
+    for raw_route in raw_routes:
+        if not isinstance(raw_route, dict):
+            raise ResidentRegistryError(
+                f"resident {resident_id} mcp_routes entries must be objects"
+            )
+        route_id = _route_string(raw_route, "id", resident_id)
+        if not MCP_ROUTE_ID_PATTERN.fullmatch(route_id):
+            raise ResidentRegistryError(f"unsafe MCP route id: {route_id!r}")
+        if route_id in seen_ids:
+            raise ResidentRegistryError(f"MCP route id is duplicated: {route_id}")
+
+        write_route_id = _route_string(raw_route, "write_memory_route", resident_id)
+        write_route = memory_routes.get(write_route_id)
+        raw_read_routes = raw_route.get("read_memory_routes")
+        if write_route is None:
+            raise ResidentRegistryError(
+                f"MCP route {route_id} has unknown write_memory_route: {write_route_id!r}"
+            )
+        if not isinstance(raw_read_routes, list) or not raw_read_routes:
+            raise ResidentRegistryError(
+                f"MCP route {route_id} read_memory_routes must be a non-empty list"
+            )
+        if len(set(raw_read_routes)) != len(raw_read_routes) or not all(
+            isinstance(item, str) and item for item in raw_read_routes
+        ):
+            raise ResidentRegistryError(
+                f"MCP route {route_id} read_memory_routes must contain unique route ids"
+            )
+        if write_route_id not in raw_read_routes:
+            raise ResidentRegistryError(
+                f"MCP route {route_id} must include its write route in read routes"
+            )
+        try:
+            read_routes = tuple(memory_routes[item] for item in raw_read_routes)
+        except KeyError as exc:
+            raise ResidentRegistryError(
+                f"MCP route {route_id} has unknown read memory route: {exc.args[0]!r}"
+            ) from exc
+        if any(route.storage != "vps" for route in (write_route, *read_routes)):
+            raise ResidentRegistryError(
+                f"public MCP route {route_id} may only use VPS memory routes"
+            )
+
+        seen_ids.add(route_id)
+        routes.append(
+            ResidentMcpRoute(
+                resident_id=resident_id,
+                id=route_id,
+                write_route=write_route,
+                read_routes=read_routes,
+            )
+        )
+    return tuple(routes)
 
 
 def _validate_model_families(

@@ -24,3 +24,8 @@ Implementations can be supplied without changing the hub core:
 - Test with fixtures or emulators rather than real accounts, memories, or devices.
 
 These descriptions document extension boundaries only; they do not reproduce private implementation details.
+## Remote MCP host boundary
+
+The repository includes the original Hub-specific HTTP MCP, OAuth metadata, resource-validation, resident-route, and Plugin Socket UI reference files. It does not include the complete private FastAPI host that wires those files together.
+
+You must supply your own account model, session policy, OAuth database initialization, owner credential storage, deployment configuration, TLS/reverse proxy, production resident data, and router/lifespan assembly. The reference code must not be treated as a ready-to-deploy public authentication service until those boundaries are implemented and reviewed for the target environment.
