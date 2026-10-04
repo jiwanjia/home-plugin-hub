@@ -15,6 +15,15 @@ class FakeClient:
         return self.result
 
 
+def _phone_status():
+    return {
+        "online": True,
+        "agent_version": "0.2.4",
+        "pending_count": 1,
+        "queued_count": 2,
+    }
+
+
 def test_status_uses_authenticated_authoritative_hub(monkeypatch):
     authenticated = []
     expected = {
@@ -34,9 +43,17 @@ def test_status_uses_authenticated_authoritative_hub(monkeypatch):
         "from_manifest",
         lambda: FakeClient(result=expected),
     )
+    monkeypatch.setattr(
+        plugin_socket,
+        "get_phone_relay_registry",
+        lambda: SimpleNamespace(status=_phone_status),
+    )
     request = SimpleNamespace()
 
-    assert plugin_socket.plugin_socket_status(request) == expected
+    assert plugin_socket.plugin_socket_status(request) == {
+        **expected,
+        "phone_agent": _phone_status(),
+    }
     assert authenticated == [request]
 
 
@@ -53,8 +70,14 @@ def test_offline_hub_returns_visible_status(monkeypatch):
             error=HubClientError("HUB_OFFLINE", "pipe unavailable")
         ),
     )
+    monkeypatch.setattr(
+        plugin_socket,
+        "get_phone_relay_registry",
+        lambda: SimpleNamespace(status=_phone_status),
+    )
 
     result = plugin_socket.plugin_socket_status(SimpleNamespace())
 
     assert result["online"] is False
     assert result["error"]["code"] == "HUB_OFFLINE"
+    assert result["phone_agent"] == _phone_status()

@@ -1,10 +1,11 @@
-"""
-MCP 插件: Web 获取工具（抓取网页内容）
-使用 requests 库，支持 HTTPS / 重定向 / 现代 Web
-"""
+"""MCP plugin for fetching web content with the Python standard library."""
+
 import logging
 import re
-import requests
+import ssl
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
 from core.tool_base import MCPlugin, ToolResult
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,15 @@ def _strip_html(html: str) -> str:
     text = re.sub(r"<[^>]+>", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()[:3000]
+
+
+def _read_response(url: str, ssl_context=None) -> tuple[int, str, str]:
+    request = Request(url, headers=HEADERS)
+    with urlopen(request, timeout=15, context=ssl_context) as response:
+        content_type = response.headers.get("Content-Type", "")
+        charset = response.headers.get_content_charset() or "utf-8"
+        text = response.read().decode(charset, errors="replace")
+        return response.status, content_type, text
 
 
 class WebFetchPlugin(MCPlugin):
@@ -58,54 +68,62 @@ class WebFetchPlugin(MCPlugin):
             url = "https://" + url
 
         try:
-            resp = requests.get(
-                url, headers=HEADERS, timeout=15,
-                allow_redirects=True, verify=True
-            )
-            resp.raise_for_status()
-            content_type = resp.headers.get("Content-Type", "")
+            status, content_type, response_text = _read_response(url)
 
             if "json" in content_type:
-                text = resp.text
-                data = f"📦 JSON ({len(text)} 字符)\n\n{text[:3000]}"
+                data = (
+                    f"📦 JSON ({len(response_text)} 字符)\n\n"
+                    f"{response_text[:3000]}"
+                )
             else:
-                resp.encoding = resp.apparent_encoding or "utf-8"
-                html = resp.text
-                text = _strip_html(html)
+                text = _strip_html(response_text)
                 data = f"🌐 {url}\n\n{text[:3000]}"
 
             return ToolResult.success(
                 data=data,
                 operation="read",
                 path=url,
-                hints=[f"HTTP {resp.status_code}, Content-Type: {content_type}"]
+                hints=[f"HTTP {status}, Content-Type: {content_type}"]
             )
 
-        except requests.exceptions.SSLError:
-            try:
-                resp = requests.get(
-                    url, headers=HEADERS, timeout=15,
-                    allow_redirects=True, verify=False
+        except URLError as error:
+            if not isinstance(error.reason, ssl.SSLError):
+                return ToolResult.fail(
+                    f"获取失败: {error}", operation="read", path=url
                 )
-                resp.encoding = resp.apparent_encoding or "utf-8"
-                text = _strip_html(resp.text)
+            try:
+                status, content_type, response_text = _read_response(
+                    url,
+                    ssl._create_unverified_context(),
+                )
+                text = _strip_html(response_text)
                 return ToolResult.success(
                     data=f"🌐 {url} (SSL 警告已忽略)\n\n{text[:3000]}",
                     operation="read",
                     path=url,
-                    hints=["⚠️ SSL 证书验证已跳过"]
+                    hints=[
+                        "⚠️ SSL 证书验证已跳过",
+                        f"HTTP {status}, Content-Type: {content_type}",
+                    ],
                 )
-            except Exception as e:
-                return ToolResult.fail(f"获取失败 (SSL): {e}", operation="read", path=url)
+            except Exception as retry_error:
+                return ToolResult.fail(
+                    f"获取失败 (SSL): {retry_error}",
+                    operation="read",
+                    path=url,
+                )
 
-        except requests.exceptions.Timeout:
-            return ToolResult.fail(f"获取超时: {url}", operation="read", path=url)
-
-        except requests.exceptions.HTTPError as e:
+        except HTTPError as error:
             return ToolResult.fail(
-                f"HTTP 错误 {e.response.status_code}: {url}",
-                operation="read", path=url
+                f"HTTP 错误 {error.code}: {url}",
+                operation="read",
+                path=url,
             )
 
-        except Exception as e:
-            return ToolResult.fail(f"获取失败: {e}", operation="read", path=url)
+        except TimeoutError:
+            return ToolResult.fail(f"获取超时: {url}", operation="read", path=url)
+
+        except Exception as error:
+            return ToolResult.fail(
+                f"获取失败: {error}", operation="read", path=url
+            )

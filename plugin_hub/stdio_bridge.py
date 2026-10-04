@@ -1,4 +1,4 @@
-"""Thin stdio MCP bridge to the sole Home Plugin Hub process."""
+"""Thin stdio MCP bridge to the sole local Home Plugin Hub process."""
 
 import argparse
 import json
@@ -26,7 +26,7 @@ def _configure_protocol_streams() -> None:
 
 
 class StdioHubBridge:
-    """Translate MCP stdio requests into Named Pipe HubClient calls."""
+    """Translate MCP stdio requests into local HubClient calls."""
 
     def __init__(
         self,

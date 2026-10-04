@@ -47,6 +47,27 @@
 .plugin-socket-summary dl div { text-align: right; }
 .plugin-socket-summary dt { color: #888f9d; font-size: 12px; }
 .plugin-socket-summary dd { font-size: 24px; font-weight: 800; margin: 3px 0 0; }
+.phone-agent-status {
+  align-items: center;
+  background: #191b21;
+  border: 1px solid #2b2e37;
+  border-radius: 12px;
+  display: flex;
+  gap: 11px;
+  margin: -16px auto 30px;
+  max-width: 1130px;
+  padding: 13px 18px;
+}
+.phone-agent-status-dot {
+  background: #858c9a;
+  border-radius: 50%;
+  height: 9px;
+  width: 9px;
+}
+.phone-agent-status.online .phone-agent-status-dot { background: #6ad99b; box-shadow: 0 0 12px #6ad99b66; }
+.phone-agent-status.offline .phone-agent-status-dot { background: #ec7474; }
+.phone-agent-status div { display: grid; gap: 3px; }
+.phone-agent-status small { color: #858c9a; }
 .plugin-socket-error {
   background: #341d21;
   border: 1px solid #6a3039;

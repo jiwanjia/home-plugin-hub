@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Request
 
 from app.api.threads import require_session
+from phone_relay.registry import get_phone_relay_registry
 from plugin_hub.client import HubClient, HubClientError
 
 
@@ -15,9 +16,9 @@ def plugin_socket_status(request: Request) -> dict:
     require_session(request)
     client = HubClient.from_manifest()
     try:
-        return client.status()
+        hub_status = client.status()
     except HubClientError as exc:
-        return {
+        hub_status = {
             "online": False,
             "plugin_count": 0,
             "tool_count": 0,
@@ -28,3 +29,7 @@ def plugin_socket_status(request: Request) -> dict:
                 "message": str(exc),
             },
         }
+    return {
+        **hub_status,
+        "phone_agent": get_phone_relay_registry().status(),
+    }

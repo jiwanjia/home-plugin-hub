@@ -1,6 +1,9 @@
 """Short-lived Windows Named Pipe client for the Home Plugin Hub."""
 
+from __future__ import annotations
+
 import json
+import os
 from multiprocessing.connection import Client
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -10,6 +13,14 @@ from .manifest import load_manifest
 
 HOME_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = HOME_ROOT / "config" / "plugins.yaml"
+DEFAULT_LINUX_SOCKET = Path("/run/codex/plugin-hub.sock")
+
+
+def local_hub_endpoint(pipe_name: str) -> tuple[str, str]:
+    if os.name == "nt":
+        return pipe_name, "AF_PIPE"
+    socket_path = os.environ.get("HOME_PLUGIN_HUB_SOCKET", str(DEFAULT_LINUX_SOCKET))
+    return socket_path, "AF_UNIX"
 
 
 class HubClientError(RuntimeError):
@@ -24,7 +35,7 @@ class HubClient:
     """Send one JSON request per local Named Pipe connection."""
 
     def __init__(self, pipe_name: str):
-        self._pipe_name = pipe_name
+        self._address, self._family = local_hub_endpoint(pipe_name)
 
     @classmethod
     def from_manifest(cls, manifest_path: Path = DEFAULT_MANIFEST):
@@ -96,8 +107,8 @@ class HubClient:
 
         try:
             connection = Client(
-                self._pipe_name,
-                family="AF_PIPE",
+                self._address,
+                family=self._family,
                 authkey=None,
             )
         except (FileNotFoundError, OSError) as exc:

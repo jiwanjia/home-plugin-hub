@@ -203,3 +203,17 @@ Shell, filesystem, memory writes, and device actions retain their existing host 
 - [VPS selection](https://github.com/jiwanjia/home-plugin-hub/tree/vps): existing VPS versions, including Unix-socket transport and phone Agent status, plus generic Relay reference interfaces.
 - 两个公开分支是原文件选材，不是两端部署的合并，也不自动配置公网入口、设备或认证。VPS 专用差异请切换对应分支阅读；截图是 Windows 中性演示，手机工具完整私有实现仍未公开。
 - These branches preserve distinct existing file versions without rewriting production code. They do not merge deployments or configure a public ingress, devices, or authentication. The gallery is a Windows documentation demo; the complete private phone plugin is omitted.
+
+## VPS selection details / 本分支 VPS 原样选材说明
+
+This branch preserves the existing VPS variants of safe Hub files. The gallery and HOME-navigation description above document the Windows selection. This branch's original Plugin Socket page instead adds phone Agent online status, version, and pending/queued counts; expired authentication uses the host's `/login` route. It does not use the Windows HOME-navigation helper.
+
+本分支保留 VPS 原文件，未将这些差异改写成 Windows 版本。上面的展示图与 HOME 导航说明针对 Windows 分支；这里的原始插件页新增手机 Agent 在线状态、版本及等待／排队数量，会话过期跳转宿主 `/login`，没有 Windows 的 HOME 导航行为。导航 helper 文件随公共历史保留，VPS 页面不依赖它们。
+
+- `plugin_hub/client.py` and `plugin_hub/daemon.py` already select Windows named pipes or Linux Unix sockets according to the operating system. Linux uses `HOME_PLUGIN_HUB_SOCKET`, defaulting to `/run/codex/plugin-hub.sock`; configure socket-directory permissions in your own host.
+- `plugin_hub/stdio_bridge.py` explicitly configures UTF-8 protocol streams. `mcp_plugins/web_tool.py` uses the Python standard library; its original certificate-error fallback can skip certificate verification and returns a warning.
+- [`phone_relay/control_client.py`](phone_relay/control_client.py) is a generic authenticated Relay client. Set `PHONE_RELAY_CONTROL_URL` and `PHONE_RELAY_TOKEN_PATH` for your host. Its original defaults are a loopback API and a Linux token-file location; no token or production configuration is included.
+- [`app/api/phone_relay.py`](codex-web-client/backend/app/api/phone_relay.py) provides reference polling, result, health, command, and bootstrap endpoints. Mount it in a FastAPI host with appropriate proxy handling and `app.state.settings` providing `phone_relay_token`, `phone_relay_token_path`, `phone_relay_max_result_bytes`, `phone_relay_bootstrap_path`, and `project_path`. See `phone_relay/authentication.py` for token loading. Private host wiring and production authentication configuration are omitted.
+- [`app/api/plugin_socket.py`](codex-web-client/backend/app/api/plugin_socket.py) requires the host session and adds `phone_agent` from the shared Relay registry. Mount both routers in the same backend process when using this registry. Original frontend and backend Plugin Socket tests are included.
+- 手机执行链仍由自建宿主 Relay 与已授权手机 Agent 承接；`mcp_plugins/phone_control.py` 因私人内容整份未公开，相关依赖测试亦未包含。不能把本分支当作开箱即用的手机 MCP 或完整 HOME 部署。源码选材不迁移服务、设备、数据、认证或公网入口。
+- The complete `phone_control` plugin and tests depending on it are omitted. This is a reference source selection, not a complete phone MCP or HOME deployment. No services, devices, data, authentication, or public ingress are migrated by publishing it.

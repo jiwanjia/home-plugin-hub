@@ -1,15 +1,23 @@
 """Single-process Home Plugin Hub served over a Windows Named Pipe."""
 
+from __future__ import annotations
+
 import argparse
 import signal
+import sys
 import threading
 from multiprocessing.connection import Client as PipeClient
 from multiprocessing.connection import Listener
 from pathlib import Path
 from typing import Optional
 
-from .client import DEFAULT_MANIFEST, HubClient
+from .client import DEFAULT_MANIFEST, HubClient, local_hub_endpoint
 from .core import PluginHub
+
+
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 from .manifest import HubManifest, load_manifest
 from .request_router import HubRequestRouter
 
@@ -36,10 +44,20 @@ class HubDaemon:
             raise RuntimeError("Hub daemon 尚未加载配置")
         return self._manifest.pipe_name
 
+    @property
+    def endpoint(self) -> tuple[str, str]:
+        return local_hub_endpoint(self.pipe_name)
+
     def serve_forever(self) -> None:
         """Start the sole catalog and serve requests until asked to stop."""
         self._manifest = load_manifest(self._manifest_path)
         self._refuse_second_instance()
+        address, family = self.endpoint
+        if family == "AF_UNIX":
+            socket_path = Path(address)
+            socket_path.parent.mkdir(parents=True, exist_ok=True)
+            if socket_path.exists():
+                socket_path.unlink()
 
         self._hub = PluginHub(self._manifest_path)
         self._hub.start()
@@ -50,10 +68,12 @@ class HubDaemon:
 
         try:
             self._listener = Listener(
-                self.pipe_name,
-                family="AF_PIPE",
+                address,
+                family=family,
                 authkey=None,
             )
+            if family == "AF_UNIX":
+                Path(address).chmod(0o660)
             serve_thread = threading.Thread(
                 target=self._serve_connections,
                 name="home-plugin-hub-pipe",
@@ -81,8 +101,7 @@ class HubDaemon:
 
         try:
             wakeup = PipeClient(
-                self.pipe_name,
-                family="AF_PIPE",
+                *self.endpoint,
                 authkey=None,
             )
         except OSError:
@@ -95,6 +114,12 @@ class HubDaemon:
         if listener is not None:
             try:
                 listener.close()
+            except OSError:
+                pass
+        address, family = self.endpoint
+        if family == "AF_UNIX":
+            try:
+                Path(address).unlink(missing_ok=True)
             except OSError:
                 pass
 
