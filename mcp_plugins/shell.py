@@ -3,9 +3,16 @@ MCP 插件: Shell 命令执行
 """
 import subprocess
 import logging
+import os
 from core.tool_base import MCPlugin, ToolResult
 
 logger = logging.getLogger(__name__)
+
+
+def _build_shell_command(command: str) -> list[str]:
+    if os.name == "nt":
+        return ["powershell", "-Command", command]
+    return ["/bin/sh", "-lc", command]
 
 
 class ShellPlugin(MCPlugin):
@@ -15,14 +22,14 @@ class ShellPlugin(MCPlugin):
 
     @property
     def description(self) -> str:
-        return "执行 Shell 命令（Windows PowerShell），用于文件操作、运行脚本、安装包等"
+        return "执行当前主机的 Shell 命令，用于文件操作、运行脚本、安装包等"
 
     @property
     def parameters(self) -> dict:
         return {
             "command": {
                 "type": "string",
-                "description": "要执行的 PowerShell 命令",
+                "description": "要执行的 Shell 命令",
             }
         }
 
@@ -30,7 +37,7 @@ class ShellPlugin(MCPlugin):
         logger.info(f"执行 Shell: {command[:100]}")
         try:
             result = subprocess.run(
-                ["powershell", "-Command", command],
+                _build_shell_command(command),
                 capture_output=True, text=True, timeout=30
             )
             output = result.stdout or ""

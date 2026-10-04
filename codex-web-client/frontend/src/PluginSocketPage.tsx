@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { homeUrl, workspaceLoginUrl } from "./workspace-navigation";
 
 type ToolStatus = {
   name: string;
@@ -57,7 +58,7 @@ export function PluginSocketPage() {
     try {
       const response = await fetch("/api/plugin-socket");
       if (response.status === 401) {
-        location.href = "/login";
+        location.href = workspaceLoginUrl(location.href);
         return;
       }
       setStatus(await response.json());
@@ -80,6 +81,7 @@ export function PluginSocketPage() {
       <header className="plugin-socket-header">
         <div>
           <a href="/workspace/continuum">← 返回工作区</a>
+          <a href={homeUrl(location.href)} style={{ marginLeft: 16 }}>HOME</a>
           <h1>Home Plugin Socket</h1>
           <p>所有住户共用的唯一工具清单</p>
         </div>
